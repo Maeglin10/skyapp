@@ -1,0 +1,136 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [pgvector(map: "vector")]
+}
+
+enum AgentRole {
+  COORDINATOR
+  WORKER
+  ANALYST
+  DEBUGGER
+}
+
+enum AgentStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  BLOCKED
+}
+
+enum TaskStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum LLMProvider {
+  ANTHROPIC
+  OPENAI
+  GEMINI
+}
+
+model Agent {
+  id          String      @id @default(uuid())
+  name        String
+  role        AgentRole
+  model       String
+  provider    LLMProvider
+  systemPrompt String?
+  maxIterations Int       @default(10)
+  status      AgentStatus @default(PENDING)
+  metadata    Json        @default("{}")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tasks       Task[]
+  steps       AgentStep[]
+  memories    MemoryEntry[]
+  usageLogs   AiUsageLog[]
+}
+
+model Task {
+  id           String     @id @default(uuid())
+  agentId      String?
+  agent        Agent?     @relation(fields: [agentId], references: [id])
+  parentTaskId String?
+  parentTask   Task?      @relation("TaskHierarchy", fields: [parentTaskId], references: [id])
+  childTasks   Task[]     @relation("TaskHierarchy")
+  dependencies String[]   @default([])
+  title        String
+  description  String
+  status       TaskStatus @default(PENDING)
+  result       Json?
+  error        String?
+  retryCount   Int        @default(0)
+  maxRetries   Int        @default(3)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  completedAt  DateTime?
+}
+
+model AgentStep {
+  id         String   @id @default(uuid())
+  agentId    String
+  agent      Agent    @relation(fields: [agentId], references: [id])
+  iteration  Int
+  type       String
+  content    Json
+  tokensUsed Int      @default(0)
+  durationMs Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+model ToolExecutionLog {
+  id         String   @id @default(uuid())
+  agentId    String
+  toolName   String
+  input      Json
+  output     Json?
+  error      String?
+  durationMs Int      @default(0)
+  success    Boolean
+  createdAt  DateTime @default(now())
+}
+
+model MemoryEntry {
+  id        String                      @id @default(uuid())
+  agentId   String
+  agent     Agent                       @relation(fields: [agentId], references: [id])
+  content   String
+  embedding Unsupported("vector(1536)")?
+  metadata  Json                        @default("{}")
+  createdAt DateTime                    @default(now())
+}
+
+model AiUsageLog {
+  id           String      @id @default(uuid())
+  agentId      String
+  agent        Agent       @relation(fields: [agentId], references: [id])
+  provider     LLMProvider
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  costUsd      Float
+  createdAt    DateTime    @default(now())
+}
+
+model AiBudget {
+  id                String   @id @default(uuid())
+  name              String   @unique
+  monthlyLimitUsd   Float    @default(50)
+  dailyLimitUsd     Float?
+  alertThreshold    Float    @default(0.8)
+  killSwitch        Boolean  @default(false)
+  currentMonthSpend Float    @default(0)
+  currentDaySpend   Float    @default(0)
+  resetAt           DateTime
+  updatedAt         DateTime @updatedAt
+}

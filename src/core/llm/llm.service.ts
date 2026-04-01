@@ -45,7 +45,7 @@ export class LLMService {
     const anthropicTools = tools?.map((tool) => ({
       name: tool.name,
       description: tool.description,
-      input_schema: tool.inputSchema,
+      input_schema: tool.inputSchema as Record<string, unknown>,
     }));
 
     const response = await client.messages.create({
@@ -76,7 +76,7 @@ export class LLMService {
       toolCalls,
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
-      stopReason: response.stop_reason,
+      stopReason: response.stop_reason || 'stop',
     };
   }
 
@@ -113,7 +113,7 @@ export class LLMService {
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: tool.inputSchema,
+        parameters: tool.inputSchema as Record<string, unknown>,
       },
     }));
 
@@ -159,7 +159,7 @@ export class LLMService {
     systemPrompt?: string,
   ): Promise<LLMResponse> {
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
     const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
     const genModel = client.getGenerativeModel({ model });
@@ -175,7 +175,7 @@ export class LLMService {
             functionDeclarations: tools.map((tool) => ({
               name: tool.name,
               description: tool.description,
-              parameters: tool.inputSchema,
+              parameters: tool.inputSchema as Record<string, unknown>,
             })),
           },
         ]
@@ -184,8 +184,8 @@ export class LLMService {
     const systemInstruction = systemPrompt ? `${systemPrompt}\n\nYou are a helpful AI assistant.` : undefined;
 
     const response = await genModel.generateContent({
-      contents: geminiMessages,
-      tools: geminiTools,
+      contents: geminiMessages as any,
+      tools: geminiTools as any,
       systemInstruction,
     });
 

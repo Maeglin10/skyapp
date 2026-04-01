@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import type { BufferEncoding } from 'fs';
 import { ToolDefinition, ToolContext, ToolResult } from '../tool.types';
 
 const FileReadInput = z.object({
@@ -20,7 +21,7 @@ export const FileReadTool: ToolDefinition<typeof FileReadInput> = {
       if (!safePath.startsWith(path.resolve(ctx.workingDir))) {
         return { success: false, output: null, error: 'Path traversal not allowed', durationMs: Date.now() - start };
       }
-      const content = await fs.readFile(safePath, input.encoding);
+      const content = await fs.readFile(safePath, { encoding: input.encoding as BufferEncoding });
       return { success: true, output: content, durationMs: Date.now() - start };
     } catch (e: unknown) {
       return { success: false, output: null, error: String(e), durationMs: Date.now() - start };

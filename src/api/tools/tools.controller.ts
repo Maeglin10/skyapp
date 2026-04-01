@@ -5,8 +5,8 @@ import { ToolRegistry } from '../../core/tools/tool.registry';
 import { ToolContext } from '../../core/tools/tool.types';
 
 class ExecuteToolDto {
-  @ApiProperty() @IsString() toolName: string;
-  @ApiProperty() @IsObject() input: Record<string, unknown>;
+  @ApiProperty() @IsString() toolName!: string;
+  @ApiProperty() @IsObject() input!: Record<string, unknown>;
   @ApiPropertyOptional({ type: [String] }) @IsArray() @IsOptional() permissions?: string[];
 }
 

@@ -25,6 +25,19 @@ export class LLMService {
     }
   }
 
+  async *stream(
+    provider: 'anthropic' | 'openai' | 'gemini',
+    messages: Message[],
+    tools?: ToolSchema[],
+    systemPrompt?: string,
+  ): AsyncGenerator<LLMResponse> {
+    this.logger.debug(`Stream with provider: ${provider}, messages: ${messages.length}`);
+
+    // For now, just yield a single response from chat
+    // In a real implementation, this would stream tokens/events
+    yield await this.chat(provider, messages, tools, systemPrompt);
+  }
+
   private async chatAnthropic(
     messages: Message[],
     tools?: ToolSchema[],
@@ -53,7 +66,7 @@ export class LLMService {
       max_tokens: 4096,
       system: systemPrompt,
       messages: anthropicMessages,
-      tools: anthropicTools,
+      tools: anthropicTools as any,
     });
 
     const toolCalls: ToolCall[] = [];
@@ -120,7 +133,7 @@ export class LLMService {
     const response = await client.chat.completions.create({
       model,
       messages: openaiMessages,
-      tools: openaiTools,
+      tools: openaiTools as any,
       max_tokens: 4096,
     });
 

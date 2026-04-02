@@ -5,6 +5,31 @@ import { LLMResponse, Message, ToolSchema, ToolCall } from './llm.types';
 export class LLMService {
   private readonly logger = new Logger(LLMService.name);
 
+  private async withRetry<T>(
+    fn: () => Promise<T>,
+    maxRetries = 3,
+    baseDelayMs = 1000,
+  ): Promise<T> {
+    let lastError: Error;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (err: unknown) {
+        lastError =
+          err instanceof Error ? err : new Error(String(err));
+        if (attempt === maxRetries) break;
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        this.logger.warn(
+          `LLM call failed (attempt ${attempt + 1}/${
+            maxRetries + 1
+          }), retrying in ${delay}ms: ${lastError.message}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+    throw lastError!;
+  }
+
   async chat(
     provider: 'anthropic' | 'openai' | 'gemini',
     messages: Message[],
@@ -43,54 +68,56 @@ export class LLMService {
     tools?: ToolSchema[],
     systemPrompt?: string,
   ): Promise<LLMResponse> {
-    const { Anthropic } = await import('@anthropic-ai/sdk');
-    const client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    return this.withRetry(async () => {
+      const { Anthropic } = await import('@anthropic-ai/sdk');
+      const client = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY,
+      });
 
-    const model = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
+      const model = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
-    const anthropicMessages = messages.map((msg) => ({
-      role: msg.role === 'system' ? 'user' : msg.role,
-      content: msg.content,
-    }));
+      const anthropicMessages = messages.map((msg) => ({
+        role: msg.role === 'system' ? 'user' : msg.role,
+        content: msg.content,
+      }));
 
-    const anthropicTools = tools?.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      input_schema: tool.inputSchema as Record<string, unknown>,
-    }));
+      const anthropicTools = tools?.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.inputSchema as Record<string, unknown>,
+      }));
 
-    const response = await client.messages.create({
-      model,
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: anthropicMessages,
-      tools: anthropicTools as any,
-    });
+      const response = await client.messages.create({
+        model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: anthropicMessages,
+        tools: anthropicTools as any,
+      });
 
-    const toolCalls: ToolCall[] = [];
-    let content = '';
+      const toolCalls: ToolCall[] = [];
+      let content = '';
 
-    for (const block of response.content) {
-      if (block.type === 'text') {
-        content += block.text;
-      } else if (block.type === 'tool_use') {
-        toolCalls.push({
-          id: block.id,
-          name: block.name,
-          input: block.input as Record<string, unknown>,
-        });
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          content += block.text;
+        } else if (block.type === 'tool_use') {
+          toolCalls.push({
+            id: block.id,
+            name: block.name,
+            input: block.input as Record<string, unknown>,
+          });
+        }
       }
-    }
 
-    return {
-      content,
-      toolCalls,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      stopReason: response.stop_reason || 'stop',
-    };
+      return {
+        content,
+        toolCalls,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        stopReason: response.stop_reason || 'stop',
+      };
+    });
   }
 
   private async chatOpenAI(
@@ -98,72 +125,74 @@ export class LLMService {
     tools?: ToolSchema[],
     systemPrompt?: string,
   ): Promise<LLMResponse> {
-    const { OpenAI } = await import('openai');
-    const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    return this.withRetry(async () => {
+      const { OpenAI } = await import('openai');
+      const client = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
 
-    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+      const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
-    const openaiMessages: Array<{
-      role: 'user' | 'assistant' | 'system';
-      content: string;
-    }> = [];
+      const openaiMessages: Array<{
+        role: 'user' | 'assistant' | 'system';
+        content: string;
+      }> = [];
 
-    if (systemPrompt) {
-      openaiMessages.push({ role: 'system', content: systemPrompt });
-    }
-
-    openaiMessages.push(
-      ...messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      })),
-    );
-
-    const openaiTools = tools?.map((tool) => ({
-      type: 'function' as const,
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.inputSchema as Record<string, unknown>,
-      },
-    }));
-
-    const response = await client.chat.completions.create({
-      model,
-      messages: openaiMessages,
-      tools: openaiTools as any,
-      max_tokens: 4096,
-    });
-
-    const toolCalls: ToolCall[] = [];
-    let content = '';
-
-    for (const choice of response.choices) {
-      if (choice.message.content) {
-        content += choice.message.content;
+      if (systemPrompt) {
+        openaiMessages.push({ role: 'system', content: systemPrompt });
       }
-      if (choice.message.tool_calls) {
-        for (const toolCall of choice.message.tool_calls) {
-          if (toolCall.type === 'function') {
-            toolCalls.push({
-              id: toolCall.id,
-              name: toolCall.function.name,
-              input: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
-            });
+
+      openaiMessages.push(
+        ...messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+      );
+
+      const openaiTools = tools?.map((tool) => ({
+        type: 'function' as const,
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.inputSchema as Record<string, unknown>,
+        },
+      }));
+
+      const response = await client.chat.completions.create({
+        model,
+        messages: openaiMessages,
+        tools: openaiTools as any,
+        max_tokens: 4096,
+      });
+
+      const toolCalls: ToolCall[] = [];
+      let content = '';
+
+      for (const choice of response.choices) {
+        if (choice.message.content) {
+          content += choice.message.content;
+        }
+        if (choice.message.tool_calls) {
+          for (const toolCall of choice.message.tool_calls) {
+            if (toolCall.type === 'function') {
+              toolCalls.push({
+                id: toolCall.id,
+                name: toolCall.function.name,
+                input: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
+              });
+            }
           }
         }
       }
-    }
 
-    return {
-      content,
-      toolCalls,
-      inputTokens: response.usage?.prompt_tokens || 0,
-      outputTokens: response.usage?.completion_tokens || 0,
-      stopReason: response.choices[0]?.finish_reason || 'stop',
-    };
+      return {
+        content,
+        toolCalls,
+        inputTokens: response.usage?.prompt_tokens || 0,
+        outputTokens: response.usage?.completion_tokens || 0,
+        stopReason: response.choices[0]?.finish_reason || 'stop',
+      };
+    });
   }
 
   private async chatGemini(

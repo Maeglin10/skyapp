@@ -13,6 +13,7 @@ import { MemoryApiModule } from './api/memory/memory.module';
 import { ToolsApiModule } from './api/tools/tools.module';
 import { AdminModule } from './api/admin/admin.module';
 import { HealthModule } from './api/health/health.module';
+import { PluginsModule } from './core/plugins/plugins.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { HealthModule } from './api/health/health.module';
     ToolsApiModule,
     AdminModule,
     HealthModule,
+    PluginsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

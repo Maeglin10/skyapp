@@ -1,0 +1,35 @@
+{
+  "plugins": [
+    {
+      "name": "weather_check",
+      "description": "Get current weather for a city using an HTTP API",
+      "permission": "http_request",
+      "inputSchema": {
+        "properties": {
+          "city": { "type": "string", "description": "City name" }
+        },
+        "required": ["city"]
+      },
+      "config": {
+        "type": "http",
+        "url": "https://wttr.in/{{city}}?format=3",
+        "method": "GET"
+      }
+    },
+    {
+      "name": "list_files",
+      "description": "List files in a directory",
+      "permission": "shell_exec",
+      "inputSchema": {
+        "properties": {
+          "dir": { "type": "string", "description": "Directory path" }
+        },
+        "required": ["dir"]
+      },
+      "config": {
+        "type": "shell",
+        "command": "ls -la {{input.dir}}"
+      }
+    }
+  ]
+}

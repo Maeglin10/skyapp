@@ -6,6 +6,7 @@ import { MemoryService } from '../memory/memory.service';
 import { AgentConfig, AgentState, AgentStep, RunAgentInput, RunAgentResult } from './agent.types';
 import { ToolCall } from '../llm/llm.types';
 import { ToolContext, ToolPermission } from '../tools/tool.types';
+import { withRetry } from './retry';
 
 @Injectable()
 export class AgentRunnerService {
@@ -46,7 +47,10 @@ export class AgentRunnerService {
       this.logger.debug(`Agent ${agentId} iteration ${state.iteration}/${config.maxIterations}`);
 
       const stepStart = Date.now();
-      const response = await this.llm.chat(config.provider, state.messages, availableTools, systemPrompt);
+      const response = await withRetry(
+        () => this.llm.chat(config.provider, state.messages, availableTools, systemPrompt),
+        { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 30000 },
+      );
       totalTokens += response.inputTokens + response.outputTokens;
 
       await this.logUsage(agentId, config, response.inputTokens, response.outputTokens);

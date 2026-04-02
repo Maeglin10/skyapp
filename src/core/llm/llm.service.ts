@@ -200,61 +200,63 @@ export class LLMService {
     tools?: ToolSchema[],
     systemPrompt?: string,
   ): Promise<LLMResponse> {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+    return this.withRetry(async () => {
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-    const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-    const genModel = client.getGenerativeModel({ model });
+      const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+      const genModel = client.getGenerativeModel({ model });
 
-    const geminiMessages = messages.map((msg) => ({
-      role: msg.role === 'system' ? 'user' : msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.content }],
-    }));
+      const geminiMessages = messages.map((msg) => ({
+        role: msg.role === 'system' ? 'user' : msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.content }],
+      }));
 
-    const geminiTools = tools?.length
-      ? [
-          {
-            functionDeclarations: tools.map((tool) => ({
-              name: tool.name,
-              description: tool.description,
-              parameters: tool.inputSchema as Record<string, unknown>,
-            })),
-          },
-        ]
-      : undefined;
+      const geminiTools = tools?.length
+        ? [
+            {
+              functionDeclarations: tools.map((tool) => ({
+                name: tool.name,
+                description: tool.description,
+                parameters: tool.inputSchema as Record<string, unknown>,
+              })),
+            },
+          ]
+        : undefined;
 
-    const systemInstruction = systemPrompt ? `${systemPrompt}\n\nYou are a helpful AI assistant.` : undefined;
+      const systemInstruction = systemPrompt ? `${systemPrompt}\n\nYou are a helpful AI assistant.` : undefined;
 
-    const response = await genModel.generateContent({
-      contents: geminiMessages as any,
-      tools: geminiTools as any,
-      systemInstruction,
-    });
+      const response = await genModel.generateContent({
+        contents: geminiMessages as any,
+        tools: geminiTools as any,
+        systemInstruction,
+      });
 
-    const toolCalls: ToolCall[] = [];
-    let content = '';
+      const toolCalls: ToolCall[] = [];
+      let content = '';
 
-    const responseContent = response.response.candidates?.[0]?.content;
-    if (responseContent) {
-      for (const part of responseContent.parts) {
-        if (part.text) {
-          content += part.text;
-        } else if ('functionCall' in part && part.functionCall) {
-          toolCalls.push({
-            id: `${part.functionCall.name}-${Date.now()}`,
-            name: part.functionCall.name,
-            input: (part.functionCall.args as Record<string, unknown>) || {},
-          });
+      const responseContent = response.response.candidates?.[0]?.content;
+      if (responseContent) {
+        for (const part of responseContent.parts) {
+          if (part.text) {
+            content += part.text;
+          } else if ('functionCall' in part && part.functionCall) {
+            toolCalls.push({
+              id: `${part.functionCall.name}-${Date.now()}`,
+              name: part.functionCall.name,
+              input: (part.functionCall.args as Record<string, unknown>) || {},
+            });
+          }
         }
       }
-    }
 
-    return {
-      content,
-      toolCalls,
-      inputTokens: 0,
-      outputTokens: 0,
-      stopReason: 'stop',
-    };
+      return {
+        content,
+        toolCalls,
+        inputTokens: 0,
+        outputTokens: 0,
+        stopReason: 'stop',
+      };
+    });
   }
 }

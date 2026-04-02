@@ -4,14 +4,14 @@ import { IsString, IsOptional, IsNumber } from 'class-validator';
 import { MemoryService } from '../../core/memory/memory.service';
 
 class QueryMemoryDto {
-  @ApiProperty() @IsString() query: string;
-  @ApiProperty() @IsString() agentId: string;
+  @ApiProperty() @IsString() query!: string;
+  @ApiProperty() @IsString() agentId!: string;
   @ApiPropertyOptional() @IsNumber() @IsOptional() topK?: number;
 }
 
 class StoreMemoryDto {
-  @ApiProperty() @IsString() agentId: string;
-  @ApiProperty() @IsString() content: string;
+  @ApiProperty() @IsString() agentId!: string;
+  @ApiProperty() @IsString() content!: string;
 }
 
 @ApiTags('Memory')

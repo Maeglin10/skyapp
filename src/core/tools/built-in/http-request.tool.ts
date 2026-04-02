@@ -4,7 +4,7 @@ import { ToolDefinition, ToolContext, ToolResult } from '../tool.types';
 const HttpRequestInput = z.object({
   url: z.string().url(),
   method: z.enum(['GET', 'POST', 'PUT', 'DELETE']).default('GET'),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
   body: z.string().optional(),
 });
 
@@ -16,7 +16,9 @@ export const HttpRequestTool: ToolDefinition<typeof HttpRequestInput> = {
   async execute(input, _ctx: ToolContext): Promise<ToolResult> {
     const start = Date.now();
     try {
-      const response = await fetch(input.url, { method: input.method, headers: input.headers, body: input.body, signal: AbortSignal.timeout(15000) });
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(input.url, { method: input.method, headers: input.headers as HeadersInit, body: input.body, signal: controller.signal }).finally(() => clearTimeout(timer));
       const text = await response.text();
       return { success: response.ok, output: { status: response.status, body: text.slice(0, 10000) }, durationMs: Date.now() - start };
     } catch (e: unknown) {

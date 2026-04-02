@@ -9,7 +9,6 @@
     "target": "ES2021",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
@@ -17,11 +16,6 @@
     "strictBindCallApply": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
-    "paths": {
-      "@core/*": ["src/core/*"],
-      "@api/*": ["src/api/*"],
-      "@services/*": ["src/services/*"],
-      "@schemas/*": ["src/schemas/*"]
-    }
+    "types": ["jest", "node"]
   }
 }

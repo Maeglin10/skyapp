@@ -207,6 +207,10 @@ describe('TasksService', () => {
       await expect(service.findOne('nonexistent-id')).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('should include correct error message when task not found', async () => {
+      mockPrismaService.task.findUnique.mockResolvedValueOnce(null);
 
       await expect(service.findOne('nonexistent-id')).rejects.toThrow(
         'Task nonexistent-id not found',

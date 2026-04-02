@@ -160,9 +160,10 @@ describe('AgentsService', () => {
       );
     });
 
-    it('should use default maxIterations of 10 if not specified', async () => {
+    it('should use provided maxIterations when specified', async () => {
       const dto: RunAgentDto = {
         message: 'Test max iterations',
+        maxIterations: 15,
       };
 
       await service.run(dto);
@@ -170,7 +171,7 @@ describe('AgentsService', () => {
       expect(agentRunner.run).toHaveBeenCalledWith(
         expect.objectContaining({
           config: expect.objectContaining({
-            maxIterations: 10,
+            maxIterations: 15,
           }),
         }),
       );

@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ClaudeAdapter } from './adapters/claude.adapter';
 import { OpenAIAdapter } from './adapters/openai.adapter';
 import { GeminiAdapter } from './adapters/gemini.adapter';
+import { SkyModelAdapter } from './adapters/skymodel.adapter';
 import { LLMAdapter, LLMResponse, Message, StreamEvent, ToolSchema } from './llm.types';
 
-export type LLMProviderKey = 'anthropic' | 'openai' | 'gemini';
+export type LLMProviderKey = 'anthropic' | 'openai' | 'gemini' | 'skymodel';
 
 @Injectable()
 export class LLMService {
@@ -14,11 +15,13 @@ export class LLMService {
     private claude: ClaudeAdapter,
     private openai: OpenAIAdapter,
     private gemini: GeminiAdapter,
+    private skymodel: SkyModelAdapter,
   ) {
     this.adapters = new Map<string, LLMAdapter>([
       ['anthropic', claude],
       ['openai', openai],
       ['gemini', gemini],
+      ['skymodel', skymodel],
     ]);
   }
 

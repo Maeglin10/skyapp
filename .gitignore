@@ -2,3 +2,8 @@ node_modules/
 dist/
 .env
 *.tsbuildinfo
+
+/generated/prisma
+
+# model-lab — local only, never pushed to GitHub
+src/core/model-lab/

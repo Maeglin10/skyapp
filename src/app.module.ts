@@ -14,6 +14,7 @@ import { AdminModule } from './api/admin/admin.module';
 import { HealthModule } from './api/health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { AppThrottlerModule } from './common/throttler/throttler.module';
+import { ModelLabModule } from './core/model-lab/model-lab.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AppThrottlerModule } from './common/throttler/throttler.module';
     HealthModule,
     AppThrottlerModule,
     AuthModule,
+    ModelLabModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

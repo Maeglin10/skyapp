@@ -2,7 +2,7 @@ import { Message } from '../llm/llm.types';
 
 export type AgentStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'BLOCKED';
 export type AgentRole = 'COORDINATOR' | 'WORKER' | 'ANALYST' | 'DEBUGGER';
-export type LLMProviderKey = 'anthropic' | 'openai' | 'gemini';
+export type LLMProviderKey = 'anthropic' | 'openai' | 'gemini' | 'skymodel';
 
 export interface AgentConfig {
   id: string;

@@ -104,9 +104,10 @@ export class AgentRunnerService {
   }
 
   private async logUsage(agentId: string, config: AgentConfig, inputTokens: number, outputTokens: number) {
-    const costs: Record<string, number> = { anthropic: 0.000001, openai: 0.0000005, gemini: 0.0000001 };
+    const costs: Record<string, number> = { anthropic: 0.000001, openai: 0.0000005, gemini: 0.0000001, skymodel: 0 };
     const costUsd = (inputTokens + outputTokens) * (costs[config.provider] ?? 0.000001);
-    await this.prisma.aiUsageLog.create({ data: { agentId, provider: config.provider.toUpperCase() as 'ANTHROPIC' | 'OPENAI' | 'GEMINI', model: config.model, inputTokens, outputTokens, costUsd } });
+    const providerEnum = (config.provider === 'skymodel' ? 'ANTHROPIC' : config.provider.toUpperCase()) as 'ANTHROPIC' | 'OPENAI' | 'GEMINI';
+    await this.prisma.aiUsageLog.create({ data: { agentId, provider: providerEnum, model: config.model, inputTokens, outputTokens, costUsd } });
   }
 
   private async persistSteps(agentId: string, steps: AgentStep[]) {

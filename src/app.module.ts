@@ -7,6 +7,7 @@ import { LoggerModule } from './services/logger/logger.module';
 import { TraceModule } from './services/trace/trace.module';
 import { AiGovernanceModule } from './services/ai-governance/ai-governance.module';
 import { AuthModule } from './services/auth/auth.module';
+import { CacheModule } from './services/cache/cache.module';
 import { AgentsApiModule } from './api/agents/agents.module';
 import { TasksApiModule } from './api/tasks/tasks.module';
 import { MemoryApiModule } from './api/memory/memory.module';
@@ -24,6 +25,7 @@ import { PluginsModule } from './core/plugins/plugins.module';
     TraceModule,
     AiGovernanceModule,
     AuthModule,
+    CacheModule,
     AgentsApiModule,
     TasksApiModule,
     MemoryApiModule,

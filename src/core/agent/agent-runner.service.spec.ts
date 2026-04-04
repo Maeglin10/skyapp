@@ -5,6 +5,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { LLMService } from '../llm/llm.service';
 import { ToolRegistry } from '../tools/tool.registry';
 import { MemoryService } from '../memory/memory.service';
+import { AiGovernanceService } from '../../services/ai-governance/ai-governance.service';
+import { TraceService } from '../../services/trace/trace.service';
 import { AgentConfig } from './agent.types';
 
 describe('AgentRunnerService', () => {
@@ -14,6 +16,8 @@ describe('AgentRunnerService', () => {
   const mockTools = { getForPermissions: jest.fn().mockReturnValue([]), execute: jest.fn() };
   const mockMemory = { getRecent: jest.fn().mockResolvedValue([]), search: jest.fn().mockResolvedValue([]), store: jest.fn().mockResolvedValue({}) };
   const mockPromptLibrary = { formatAsContext: jest.fn().mockReturnValue('') };
+  const mockGovernance = { checkBudget: jest.fn().mockResolvedValue({ allowed: true, remainingBudget: 50 }), recordSpend: jest.fn().mockResolvedValue(undefined) };
+  const mockTrace = { record: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -24,6 +28,8 @@ describe('AgentRunnerService', () => {
       { provide: ToolRegistry, useValue: mockTools },
       { provide: MemoryService, useValue: mockMemory },
       { provide: PromptLibraryService, useValue: mockPromptLibrary },
+      { provide: AiGovernanceService, useValue: mockGovernance },
+      { provide: TraceService, useValue: mockTrace },
     ] }).compile();
     service = m.get(AgentRunnerService);
   });

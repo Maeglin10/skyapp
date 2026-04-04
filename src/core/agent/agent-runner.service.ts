@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LLMService } from '../llm/llm.service';
 import { ToolRegistry } from '../tools/tool.registry';
 import { MemoryService } from '../memory/memory.service';
 import { PromptLibraryService } from './prompt-library.service';
+import { AiGovernanceService } from '../../services/ai-governance/ai-governance.service';
+import { TraceService } from '../../services/trace/trace.service';
 import { AgentConfig, AgentRole, AgentState, AgentStep, RunAgentInput, RunAgentResult } from './agent.types';
 import { ToolCall } from '../llm/llm.types';
 import { ToolContext, ToolPermission } from '../tools/tool.types';
@@ -18,12 +20,21 @@ export class AgentRunnerService {
     private tools: ToolRegistry,
     private memory: MemoryService,
     private promptLibrary: PromptLibraryService,
+    private governance: AiGovernanceService,
+    private trace: TraceService,
   ) {}
 
   async run(input: RunAgentInput): Promise<RunAgentResult> {
     const startTime = Date.now();
     const config = { ...input.config, maxIterations: input.config.maxIterations ?? 10 };
     const agentId = input.agentId ?? crypto.randomUUID();
+
+    // Budget check before running
+    const budget = await this.governance.checkBudget();
+    if (!budget.allowed) {
+      throw new ForbiddenException(`AI budget blocked: ${budget.reason}`);
+    }
+    this.trace.record({ agentId, event: 'agent.start', data: { role: config.role, provider: config.provider, model: config.model } });
 
     const state: AgentState = { status: 'RUNNING', messages: [], iteration: 0, steps: [] };
 
@@ -65,9 +76,12 @@ export class AgentRunnerService {
       const response = await this.llm.chat(config.provider, state.messages, availableTools, systemPrompt);
       totalTokens += response.inputTokens + response.outputTokens;
 
+      const stepCostUsd = (response.inputTokens + response.outputTokens) * ({ anthropic: 0.000001, openai: 0.0000005, gemini: 0.0000001 }[config.provider] ?? 0.000001);
       await this.logUsage(agentId, config, response.inputTokens, response.outputTokens);
+      await this.governance.recordSpend(stepCostUsd);
 
       state.steps.push({ iteration: state.iteration, type: 'reasoning', content: response.content, tokensUsed: response.inputTokens + response.outputTokens, durationMs: Date.now() - stepStart, timestamp: new Date() });
+      this.trace.record({ agentId, event: 'agent.iteration', data: { iteration: state.iteration, tokens: response.inputTokens + response.outputTokens, hasToolCalls: response.toolCalls.length > 0 } });
 
       if (response.toolCalls.length === 0 || response.stopReason === 'end_turn') {
         state.status = 'COMPLETED';
@@ -107,12 +121,15 @@ export class AgentRunnerService {
       });
     }
 
+    this.trace.record({ agentId, event: 'agent.end', data: { status: state.status, totalTokens, durationMs: Date.now() - startTime, iterations: state.iteration } });
     return { agentId, status: state.status, output: state.output ?? state.error ?? '', steps: state.steps, totalTokens, durationMs: Date.now() - startTime };
   }
 
   private async executeToolCall(toolCall: ToolCall, ctx: ToolContext, state: AgentState, agentId: string) {
     const start = Date.now();
+    this.trace.record({ agentId, event: 'tool.call', data: { tool: toolCall.name, input: toolCall.input } });
     const result = await this.tools.execute(toolCall.name, toolCall.input, ctx);
+    this.trace.record({ agentId, event: 'tool.result', data: { tool: toolCall.name, success: result.success, durationMs: result.durationMs } });
     state.steps.push({ iteration: state.iteration, type: result.success ? 'tool_result' : 'tool_call', content: { tool: toolCall.name, input: toolCall.input, output: result.output, error: result.error }, tokensUsed: 0, durationMs: Date.now() - start, timestamp: new Date() });
     await this.prisma.toolExecutionLog.create({ data: { agentId, toolName: toolCall.name, input: toolCall.input as object, output: result.output as object, error: result.error, durationMs: result.durationMs, success: result.success } });
     return result;

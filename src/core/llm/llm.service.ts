@@ -55,12 +55,53 @@ export class LLMService {
     messages: Message[],
     tools?: ToolSchema[],
     systemPrompt?: string,
-  ): AsyncGenerator<LLMResponse> {
+  ): AsyncGenerator<string> {
     this.logger.debug(`Stream with provider: ${provider}, messages: ${messages.length}`);
+    if (provider === 'anthropic') {
+      yield* this.streamAnthropic(messages, tools, systemPrompt);
+    } else {
+      // OpenAI / Gemini: chunk the full response word by word
+      const response = await this.chat(provider, messages, tools, systemPrompt);
+      for (const word of response.content.split(' ')) {
+        yield word + ' ';
+      }
+    }
+  }
 
-    // For now, just yield a single response from chat
-    // In a real implementation, this would stream tokens/events
-    yield await this.chat(provider, messages, tools, systemPrompt);
+  private async *streamAnthropic(
+    messages: Message[],
+    tools?: ToolSchema[],
+    systemPrompt?: string,
+  ): AsyncGenerator<string> {
+    const { Anthropic } = await import('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const model = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
+
+    const anthropicMessages = messages.map(msg => ({
+      role: (msg.role === 'system' ? 'user' : msg.role) as 'user' | 'assistant',
+      content: msg.content,
+    }));
+
+    const streamParams = {
+      model,
+      max_tokens: 4096,
+      messages: anthropicMessages,
+      ...(systemPrompt ? { system: systemPrompt } : {}),
+      ...(tools?.length ? {
+        tools: tools.map(t => ({
+          name: t.name,
+          description: t.description,
+          input_schema: t.inputSchema as { type: 'object'; properties?: Record<string, unknown> },
+        })),
+      } : {}),
+    };
+
+    const stream = client.messages.stream(streamParams as Parameters<typeof client.messages.stream>[0]);
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && 'delta' in event && (event.delta as { type: string }).type === 'text_delta') {
+        yield (event.delta as { type: string; text: string }).text;
+      }
+    }
   }
 
   private async chatAnthropic(

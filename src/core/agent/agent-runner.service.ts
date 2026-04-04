@@ -3,7 +3,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { LLMService } from '../llm/llm.service';
 import { ToolRegistry } from '../tools/tool.registry';
 import { MemoryService } from '../memory/memory.service';
-import { AgentConfig, AgentState, AgentStep, RunAgentInput, RunAgentResult } from './agent.types';
+import { PromptLibraryService } from './prompt-library.service';
+import { AgentConfig, AgentRole, AgentState, AgentStep, RunAgentInput, RunAgentResult } from './agent.types';
 import { ToolCall } from '../llm/llm.types';
 import { ToolContext, ToolPermission } from '../tools/tool.types';
 
@@ -16,6 +17,7 @@ export class AgentRunnerService {
     private llm: LLMService,
     private tools: ToolRegistry,
     private memory: MemoryService,
+    private promptLibrary: PromptLibraryService,
   ) {}
 
   async run(input: RunAgentInput): Promise<RunAgentResult> {
@@ -25,9 +27,23 @@ export class AgentRunnerService {
 
     const state: AgentState = { status: 'RUNNING', messages: [], iteration: 0, steps: [] };
 
-    const memories = await this.memory.getRecent(agentId, 10);
-    const memoryContext = memories.length ? `\n\nRelevant memory:\n${memories.map(m => `- ${m.content}`).join('\n')}` : '';
-    const systemPrompt = (config.systemPrompt ?? this.defaultSystemPrompt(config.role)) + memoryContext;
+    // Semantic memory retrieval: combine recent + semantic similarity
+    const recentMemories = await this.memory.getRecent(agentId, 5);
+    let semanticMemories: typeof recentMemories = [];
+    try {
+      semanticMemories = await this.memory.search(agentId, input.userMessage, 5) as typeof recentMemories;
+    } catch {
+      // pgvector not available in test env, fallback to recent only
+    }
+    const allMemories = [...recentMemories];
+    for (const m of semanticMemories) {
+      if (!allMemories.find(r => r.id === m.id)) allMemories.push(m);
+    }
+    const memoryContext = allMemories.length
+      ? `\n\nRelevant past context:\n${allMemories.map(m => `- ${m.content}`).join('\n')}`
+      : '';
+    const fewShots = this.promptLibrary.formatAsContext(config.role as AgentRole);
+    const systemPrompt = (config.systemPrompt ?? this.defaultSystemPrompt(config.role)) + fewShots + memoryContext;
 
     if (input.context) {
       state.messages.push({ role: 'user', content: `Context: ${input.context}` });
@@ -75,7 +91,20 @@ export class AgentRunnerService {
     await this.persistSteps(agentId, state.steps);
 
     if (state.output) {
-      await this.memory.store(agentId, `Task: ${input.userMessage}\nResult: ${state.output}`, { role: config.role });
+      if (config.enableReflection) {
+        const reflection = await this.selfReflect(agentId, input.userMessage, state.output, config.provider, config.model);
+        if (reflection) {
+          await this.memory.store(agentId, `Reflection on "${input.userMessage}": ${reflection}`, { role: config.role, type: 'reflection' });
+          state.steps.push({ iteration: state.iteration, type: 'output', content: { reflection }, tokensUsed: 0, durationMs: 0, timestamp: new Date() });
+        }
+      }
+      await this.memory.store(agentId, `Task: ${input.userMessage}\nResult: ${state.output}`, {
+        role: config.role,
+        status: state.status,
+        iterations: state.iteration,
+        tokensUsed: totalTokens,
+        quality: state.iteration <= 3 ? 'high' : state.iteration <= 7 ? 'medium' : 'low',
+      });
     }
 
     return { agentId, status: state.status, output: state.output ?? state.error ?? '', steps: state.steps, totalTokens, durationMs: Date.now() - startTime };
@@ -89,14 +118,72 @@ export class AgentRunnerService {
     return result;
   }
 
+  private async selfReflect(agentId: string, task: string, result: string, provider: string, _model: string): Promise<string> {
+    try {
+      const r = await this.llm.chat(
+        provider as 'anthropic' | 'openai' | 'gemini',
+        [{ role: 'user', content: `Task: "${task}"\nOutput: "${result.slice(0, 500)}"\n\nIn 2-3 sentences: Did you fully address the task? What could be improved? What did you learn?` }],
+        undefined,
+        'You are an AI reflecting on your own performance. Be concise and honest.',
+      );
+      this.logger.debug(`Agent ${agentId} reflection: ${r.content.slice(0, 100)}`);
+      return r.content;
+    } catch {
+      return '';
+    }
+  }
+
   private defaultSystemPrompt(role: string): string {
-    const prompts: Record<string, string> = {
-      COORDINATOR: 'You are a coordinator agent. Decompose complex tasks into clear subtasks.',
-      WORKER: 'You are a worker agent. Execute assigned tasks precisely using available tools.',
-      ANALYST: 'You are an analyst agent. Analyze data and provide insights.',
-      DEBUGGER: 'You are a debugger agent. Find root causes and propose solutions.',
+    const base = `You are an autonomous AI agent. Think step by step. Use tools when needed. Be precise and concise in your final response.
+
+RULES:
+- If you need information, use the appropriate tool rather than guessing
+- After receiving tool results, synthesize them before responding
+- When the task is complete, provide a clear final answer without calling more tools
+- If a task is impossible or unclear, explain why`;
+
+    const rolePrompts: Record<string, string> = {
+      COORDINATOR: `${base}
+
+ROLE: Task Coordinator
+Your job is to break down complex objectives into clear, executable subtasks.
+- Identify dependencies between subtasks
+- Assign appropriate roles to each subtask (WORKER, ANALYST, DEBUGGER)
+- Ensure subtasks are atomic and testable
+- After all subtasks complete, synthesize results into a coherent final output
+
+OUTPUT FORMAT for task decomposition:
+[{"id": "1", "title": "...", "description": "...", "dependencies": [], "agentRole": "WORKER"}]`,
+
+      WORKER: `${base}
+
+ROLE: Task Executor
+Your job is to execute assigned tasks precisely using available tools.
+- Read the task description carefully before acting
+- Use tools in the most efficient order
+- Verify your work before reporting completion
+- Report the exact output produced, not what you intended to do`,
+
+      ANALYST: `${base}
+
+ROLE: Data Analyst
+Your job is to analyze data, find patterns, and provide actionable insights.
+- Structure your analysis: Overview → Key Findings → Recommendations
+- Support every claim with data from tool results
+- Quantify impact where possible
+- Flag uncertainties explicitly`,
+
+      DEBUGGER: `${base}
+
+ROLE: Debugger
+Your job is to diagnose problems and propose solutions.
+- Follow the scientific method: Observe → Hypothesize → Test → Conclude
+- Check the most likely causes first
+- Provide a root cause analysis, not just symptoms
+- Give a specific, actionable fix with code examples when relevant`,
     };
-    return prompts[role] ?? 'You are a helpful AI agent. Complete the assigned task.';
+
+    return rolePrompts[role] ?? `${base}\n\nROLE: General Assistant\nComplete the assigned task thoroughly and accurately.`;
   }
 
   private async logUsage(agentId: string, config: AgentConfig, inputTokens: number, outputTokens: number) {

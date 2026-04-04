@@ -14,6 +14,7 @@ export interface AgentConfig {
   maxIterations?: number;
   permissions?: string[];
   workingDir?: string;
+  enableReflection?: boolean;
 }
 
 export interface AgentState {

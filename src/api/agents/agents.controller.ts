@@ -18,10 +18,16 @@ export class AgentsController {
   @Post('orchestrate') @ApiOperation({ summary: 'Orchestrate a complex objective with task DAG' })
   orchestrate(@Body() dto: RunAgentDto) { return this.agentsService.orchestrate(dto); }
 
-  @Sse('stream') @ApiOperation({ summary: 'Stream agent output via SSE' })
+  @Sse('stream') @ApiOperation({ summary: 'Stream agent output via SSE (token-by-token)' })
   stream(@Body() dto: RunAgentDto): Observable<MessageEvent> {
-    const stream = this.llm.stream((dto.provider ?? 'anthropic') as any, [{ role: 'user', content: dto.message }], undefined, dto.systemPrompt);
-    return from((async function* () { for await (const e of stream) yield e; })()).pipe(map(e => ({ data: JSON.stringify(e) }) as MessageEvent));
+    const tokenStream = this.llm.stream(
+      (dto.provider ?? 'anthropic') as 'anthropic' | 'openai' | 'gemini',
+      [{ role: 'user', content: dto.message }],
+      undefined,
+      dto.systemPrompt,
+    );
+    return from((async function* () { for await (const token of tokenStream) yield token; })())
+      .pipe(map(token => ({ data: token }) as MessageEvent));
   }
 
   @Get(':id/status') @ApiOperation({ summary: 'Agent execution status' })

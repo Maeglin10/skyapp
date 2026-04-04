@@ -1,9 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LLMResponse, Message, ToolSchema, ToolCall } from './llm.types';
+import { CacheService } from '../../services/cache/cache.service';
 
 @Injectable()
 export class LLMService {
   private readonly logger = new Logger(LLMService.name);
+
+  constructor(private readonly cache: CacheService) {}
 
   private async withRetry<T>(
     fn: () => Promise<T>,
@@ -36,18 +39,34 @@ export class LLMService {
     tools?: ToolSchema[],
     systemPrompt?: string,
   ): Promise<LLMResponse> {
-    this.logger.debug(`Chat with provider: ${provider}, messages: ${messages.length}`);
+    // Cache only for non-tool calls (tools produce side effects)
+    const cacheKey = !tools?.length ? this.cache.buildKey(provider, messages, systemPrompt) : null;
+    if (cacheKey) {
+      const cached = await this.cache.get<LLMResponse>(cacheKey);
+      if (cached) {
+        this.logger.debug(`Cache HIT for provider: ${provider}`);
+        return cached;
+      }
+    }
 
+    this.logger.debug(`Chat with provider: ${provider}, messages: ${messages.length}`);
+    let response: LLMResponse;
     switch (provider) {
       case 'anthropic':
-        return this.chatAnthropic(messages, tools, systemPrompt);
+        response = await this.chatAnthropic(messages, tools, systemPrompt);
+        break;
       case 'openai':
-        return this.chatOpenAI(messages, tools, systemPrompt);
+        response = await this.chatOpenAI(messages, tools, systemPrompt);
+        break;
       case 'gemini':
-        return this.chatGemini(messages, tools, systemPrompt);
+        response = await this.chatGemini(messages, tools, systemPrompt);
+        break;
       default:
         throw new Error(`Unknown provider: ${provider}`);
     }
+
+    if (cacheKey) await this.cache.set(cacheKey, response, 3600);
+    return response;
   }
 
   async *stream(

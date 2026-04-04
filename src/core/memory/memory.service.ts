@@ -32,6 +32,57 @@ export class MemoryService {
     return this.prisma.memoryEntry.findMany({ where: { agentId }, orderBy: { createdAt: 'desc' }, take: limit }) as unknown as MemoryEntry[];
   }
 
+  async ingest(
+    agentId: string,
+    content: string,
+    metadata: Record<string, unknown> = {},
+    chunkSize = 1000,
+  ): Promise<{ chunks: number; stored: number }> {
+    const chunks = this.splitIntoChunks(content, chunkSize);
+    let stored = 0;
+    for (const chunk of chunks) {
+      try {
+        await this.store(agentId, chunk, { ...metadata, type: 'document', chunkIndex: stored });
+        stored++;
+      } catch {
+        this.logger.warn(`Failed to store chunk ${stored}`);
+      }
+    }
+    return { chunks: chunks.length, stored };
+  }
+
+  private splitIntoChunks(text: string, maxLength: number): string[] {
+    // Split on paragraph breaks first, then sentences, respecting maxLength
+    const paragraphs = text.split(/\n\n+/);
+    const chunks: string[] = [];
+    let current = '';
+
+    for (const para of paragraphs) {
+      if ((current + para).length <= maxLength) {
+        current = current ? current + '\n\n' + para : para;
+      } else {
+        if (current) chunks.push(current.trim());
+        if (para.length > maxLength) {
+          // Split long paragraph by sentences
+          const sentences = para.split(/(?<=[.!?])\s+/);
+          current = '';
+          for (const sentence of sentences) {
+            if ((current + sentence).length <= maxLength) {
+              current = current ? current + ' ' + sentence : sentence;
+            } else {
+              if (current) chunks.push(current.trim());
+              current = sentence.slice(0, maxLength);
+            }
+          }
+        } else {
+          current = para;
+        }
+      }
+    }
+    if (current.trim()) chunks.push(current.trim());
+    return chunks.filter(c => c.length > 0);
+  }
+
   private async generateEmbedding(text: string): Promise<number[]> {
     const OpenAI = (await import('openai')).default;
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

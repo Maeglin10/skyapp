@@ -5,6 +5,7 @@ import { ToolDefinition, ToolContext, ToolResult } from '../tool.types';
 
 const FileReadInput = z.object({
   path: z.string().describe('Relative path to file within working directory'),
+  encoding: z.string().optional().default('utf-8').describe('File encoding'),
 });
 
 export const FileReadTool: ToolDefinition<typeof FileReadInput> = {
@@ -19,7 +20,7 @@ export const FileReadTool: ToolDefinition<typeof FileReadInput> = {
       if (!safePath.startsWith(path.resolve(ctx.workingDir))) {
         return { success: false, output: null, error: 'Path traversal not allowed', durationMs: Date.now() - start };
       }
-      const content = await fs.readFile(safePath, 'utf-8');
+      const content = await fs.readFile(safePath, { encoding: (input.encoding ?? 'utf-8') as BufferEncoding });
       return { success: true, output: content, durationMs: Date.now() - start };
     } catch (e: unknown) {
       return { success: false, output: null, error: String(e), durationMs: Date.now() - start };
@@ -29,7 +30,7 @@ export const FileReadTool: ToolDefinition<typeof FileReadInput> = {
     return {
       name: this.name,
       description: this.description,
-      inputSchema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+      inputSchema: { type: 'object', properties: { path: { type: 'string' }, encoding: { type: 'string', default: 'utf-8' } }, required: ['path'] },
     };
   },
 };

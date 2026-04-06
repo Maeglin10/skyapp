@@ -11,12 +11,18 @@ export interface ToolCall {
   input: Record<string, unknown>;
 }
 
+export interface ToolSchema {
+  name: string;
+  description: string;
+  inputSchema: object;
+}
+
 export interface LLMResponse {
   content: string;
   toolCalls: ToolCall[];
   inputTokens: number;
   outputTokens: number;
-  stopReason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop';
+  stopReason: string;
 }
 
 export interface StreamEvent {
@@ -28,10 +34,4 @@ export interface LLMAdapter {
   provider: string;
   chat(messages: Message[], tools?: ToolSchema[], systemPrompt?: string): Promise<LLMResponse>;
   stream(messages: Message[], tools?: ToolSchema[], systemPrompt?: string): AsyncIterable<StreamEvent>;
-}
-
-export interface ToolSchema {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
 }

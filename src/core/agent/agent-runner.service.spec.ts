@@ -1,9 +1,12 @@
 import { Test } from '@nestjs/testing';
 import { AgentRunnerService } from './agent-runner.service';
+import { PromptLibraryService } from './prompt-library.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LLMService } from '../llm/llm.service';
 import { ToolRegistry } from '../tools/tool.registry';
 import { MemoryService } from '../memory/memory.service';
+import { AiGovernanceService } from '../../services/ai-governance/ai-governance.service';
+import { TraceService } from '../../services/trace/trace.service';
 import { AgentConfig } from './agent.types';
 
 describe('AgentRunnerService', () => {
@@ -11,11 +14,23 @@ describe('AgentRunnerService', () => {
   const mockPrisma = { toolExecutionLog: { create: jest.fn() }, aiUsageLog: { create: jest.fn() }, agentStep: { createMany: jest.fn() } };
   const mockLLM = { chat: jest.fn().mockResolvedValue({ content: 'Done.', toolCalls: [], inputTokens: 10, outputTokens: 5, stopReason: 'end_turn' }), stream: jest.fn() };
   const mockTools = { getForPermissions: jest.fn().mockReturnValue([]), execute: jest.fn() };
-  const mockMemory = { getRecent: jest.fn().mockResolvedValue([]), store: jest.fn().mockResolvedValue({}) };
+  const mockMemory = { getRecent: jest.fn().mockResolvedValue([]), search: jest.fn().mockResolvedValue([]), store: jest.fn().mockResolvedValue({}) };
+  const mockPromptLibrary = { formatAsContext: jest.fn().mockReturnValue('') };
+  const mockGovernance = { checkBudget: jest.fn().mockResolvedValue({ allowed: true, remainingBudget: 50 }), recordSpend: jest.fn().mockResolvedValue(undefined) };
+  const mockTrace = { record: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    const m = await Test.createTestingModule({ providers: [AgentRunnerService, { provide: PrismaService, useValue: mockPrisma }, { provide: LLMService, useValue: mockLLM }, { provide: ToolRegistry, useValue: mockTools }, { provide: MemoryService, useValue: mockMemory }] }).compile();
+    const m = await Test.createTestingModule({ providers: [
+      AgentRunnerService,
+      { provide: PrismaService, useValue: mockPrisma },
+      { provide: LLMService, useValue: mockLLM },
+      { provide: ToolRegistry, useValue: mockTools },
+      { provide: MemoryService, useValue: mockMemory },
+      { provide: PromptLibraryService, useValue: mockPromptLibrary },
+      { provide: AiGovernanceService, useValue: mockGovernance },
+      { provide: TraceService, useValue: mockTrace },
+    ] }).compile();
     service = m.get(AgentRunnerService);
   });
 

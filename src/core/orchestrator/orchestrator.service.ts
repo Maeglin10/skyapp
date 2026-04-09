@@ -2,13 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AgentRunnerService } from '../agent/agent-runner.service';
 import { LLMService } from '../llm/llm.service';
 import { TaskGraph, TaskNode } from './task-graph';
-import { AgentConfig } from '../agent/agent.types';
+import { AgentConfig, LLMProviderKey } from '../agent/agent.types';
 
 export interface OrchestratorInput {
   objective: string;
   context?: string;
   maxConcurrency?: number;
-  coordinatorProvider?: 'anthropic' | 'openai' | 'gemini' | 'skymodel';
+  coordinatorProvider?: LLMProviderKey;
 }
 
 export interface OrchestratorResult {
@@ -48,7 +48,7 @@ export class OrchestratorService {
     return { objective: input.objective, taskResults: results, summary, totalTasks: tasks.length, completedTasks: completed, failedTasks: failed, durationMs: Date.now() - startTime };
   }
 
-  private async decomposeTasks(objective: string, context: string | undefined, provider: 'anthropic' | 'openai' | 'gemini' | 'skymodel'): Promise<TaskNode[]> {
+  private async decomposeTasks(objective: string, context: string | undefined, provider: LLMProviderKey): Promise<TaskNode[]> {
     const systemPrompt = `You are a task decomposition expert. Break objectives into 2-5 tasks as a JSON array. Each task: id(string), title, description, dependencies(array of task ids), agentRole(WORKER|ANALYST|DEBUGGER). Respond ONLY with valid JSON array.`;
     const response = await this.llm.chat(provider, [{ role: 'user', content: `Decompose:\n${objective}${context ? `\nContext: ${context}` : ''}` }], undefined, systemPrompt);
     try {
@@ -84,7 +84,7 @@ export class OrchestratorService {
     }
   }
 
-  private async synthesizeResults(objective: string, results: Record<string, unknown>, provider: 'anthropic' | 'openai' | 'gemini' | 'skymodel'): Promise<string> {
+  private async synthesizeResults(objective: string, results: Record<string, unknown>, provider: LLMProviderKey): Promise<string> {
     const r = await this.llm.chat(provider, [{ role: 'user', content: `Objective: ${objective}\n\nResults:\n${JSON.stringify(results, null, 2)}\n\nSummarize what was accomplished.` }]);
     return r.content;
   }

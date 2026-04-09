@@ -6,7 +6,7 @@ import { MemoryService } from '../memory/memory.service';
 import { PromptLibraryService } from './prompt-library.service';
 import { AiGovernanceService } from '../../services/ai-governance/ai-governance.service';
 import { TraceService } from '../../services/trace/trace.service';
-import { AgentConfig, AgentRole, AgentState, AgentStep, RunAgentInput, RunAgentResult } from './agent.types';
+import { AgentConfig, AgentRole, AgentState, AgentStep, RunAgentInput, RunAgentResult, LLMProviderKey } from './agent.types';
 import { ToolCall } from '../llm/llm.types';
 import { ToolContext, ToolPermission } from '../tools/tool.types';
 import { withRetry } from './retry';
@@ -80,7 +80,7 @@ export class AgentRunnerService {
       );
       totalTokens += response.inputTokens + response.outputTokens;
 
-      const stepCostUsd = (response.inputTokens + response.outputTokens) * ({ anthropic: 0.000001, openai: 0.0000005, gemini: 0.0000001 }[config.provider] ?? 0.000001);
+      const stepCostUsd = (response.inputTokens + response.outputTokens) * ({ anthropic: 0.000001, openai: 0.0000005, gemini: 0.0000001, skymodel: 0 }[config.provider] ?? 0.000001);
       await this.logUsage(agentId, config, response.inputTokens, response.outputTokens);
       await this.governance.recordSpend(stepCostUsd);
 
@@ -142,7 +142,7 @@ export class AgentRunnerService {
   private async selfReflect(agentId: string, task: string, result: string, provider: string, _model: string): Promise<string> {
     try {
       const r = await this.llm.chat(
-        provider as 'anthropic' | 'openai' | 'gemini',
+        provider as LLMProviderKey,
         [{ role: 'user', content: `Task: "${task}"\nOutput: "${result.slice(0, 500)}"\n\nIn 2-3 sentences: Did you fully address the task? What could be improved? What did you learn?` }],
         undefined,
         'You are an AI reflecting on your own performance. Be concise and honest.',

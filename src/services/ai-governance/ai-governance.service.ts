@@ -34,4 +34,16 @@ export class AiGovernanceService {
   }
 
   async getStatus() { return this.prisma.aiBudget.findFirst({ where: { name: 'default' } }); }
+
+  async getStats() {
+    const agentsCount = await this.prisma.agent.count();
+    const logs = await this.prisma.aiUsageLog.aggregate({
+      _sum: { inputTokens: true, outputTokens: true, costUsd: true }
+    });
+    return {
+      agents: agentsCount,
+      totalTokens: (logs._sum.inputTokens || 0) + (logs._sum.outputTokens || 0),
+      totalCostUsd: logs._sum.costUsd || 0
+    };
+  }
 }

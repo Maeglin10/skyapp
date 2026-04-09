@@ -1,13 +1,15 @@
-import { Body, Controller, Get, Param, Post, Sse, MessageEvent } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Observable, from, map } from 'rxjs';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+
 import { AgentsService } from './agents.service';
 import { LLMService } from '../../core/llm/llm.service';
 import { TraceService } from '../../services/trace/trace.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RunAgentDto } from './dto/run-agent.dto';
+import { LLMProviderKey } from '../../core/agent/agent.types';
 
 @ApiTags('Agents')
+@ApiBearerAuth()
 @Controller('agents')
 export class AgentsController {
   constructor(private agentsService: AgentsService, private llm: LLMService, private trace: TraceService, private prisma: PrismaService) {}
@@ -18,17 +20,7 @@ export class AgentsController {
   @Post('orchestrate') @ApiOperation({ summary: 'Orchestrate a complex objective with task DAG' })
   orchestrate(@Body() dto: RunAgentDto) { return this.agentsService.orchestrate(dto); }
 
-  @Sse('stream') @ApiOperation({ summary: 'Stream agent output via SSE (token-by-token)' })
-  stream(@Body() dto: RunAgentDto): Observable<MessageEvent> {
-    const tokenStream = this.llm.stream(
-      (dto.provider ?? 'anthropic') as 'anthropic' | 'openai' | 'gemini',
-      [{ role: 'user', content: dto.message }],
-      undefined,
-      dto.systemPrompt,
-    );
-    return from((async function* () { for await (const token of tokenStream) yield token; })())
-      .pipe(map(token => ({ data: token }) as MessageEvent));
-  }
+
 
   @Get(':id/status') @ApiOperation({ summary: 'Agent execution status' })
   async getStatus(@Param('id') id: string) {

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiProperty, ApiPropertyOptional, ApiBearerAuth } from '@nestjs/swagger';
 import { IsString, IsOptional, IsNumber } from 'class-validator';
 import { MemoryService } from '../../core/memory/memory.service';
 import { IngestDocumentDto } from './dto/ingest-document.dto';
@@ -16,6 +16,7 @@ class StoreMemoryDto {
 }
 
 @ApiTags('Memory')
+@ApiBearerAuth()
 @Controller('memory')
 export class MemoryController {
   constructor(private memoryService: MemoryService) {}

@@ -18,6 +18,7 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "types": ["jest", "node"],
+    "baseUrl": "./",
     "paths": {
       "@core/*": ["src/core/*"],
       "@api/*": ["src/api/*"],

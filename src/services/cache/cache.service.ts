@@ -12,7 +12,7 @@ export class CacheService implements OnModuleDestroy {
     if (redisUrl) {
       try {
         this.client = new Redis(redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1 });
-        this.client.on('error', (err) => this.logger.warn(`Redis error: ${err.message}`));
+        this.client.on('error', (err: Error) => this.logger.warn(`Redis error: ${err.message}`));
         this.logger.log('Redis cache initialized');
       } catch {
         this.logger.warn('Redis unavailable, cache disabled');

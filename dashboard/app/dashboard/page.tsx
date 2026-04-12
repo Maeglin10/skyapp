@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Cpu, Activity, Copy, Check, RefreshCw, Zap, Brain, Shield } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://skyapp-api.onrender.com';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://aevia-app-api.onrender.com';
 
 function ApiKeyCard() {
   const [copied, setCopied] = useState(false);
@@ -172,7 +172,7 @@ export default function DashboardPage() {
       <nav className="border-b border-white/5 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto">
         <Link href="/" className="flex items-center gap-2">
           <Cpu className="w-6 h-6 text-violet-400" />
-          <span className="font-bold text-lg tracking-tight">SkyApp</span>
+          <span className="font-bold text-lg tracking-tight">AeviaApp</span>
         </Link>
         <div className="flex items-center gap-6">
           <Link href="/docs" className="text-sm text-neutral-400 hover:text-white transition-colors">Docs</Link>

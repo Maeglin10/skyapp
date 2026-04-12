@@ -58,7 +58,7 @@ export default function Home() {
       <nav className="border-b border-white/5 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto">
         <div className="flex items-center gap-2">
           <Cpu className="w-6 h-6 text-violet-400" />
-          <span className="font-bold text-lg tracking-tight">SkyApp</span>
+          <span className="font-bold text-lg tracking-tight">AeviaApp</span>
         </div>
         <div className="flex items-center gap-6">
           <Link href="/pricing" className="text-sm text-neutral-400 hover:text-white transition-colors">Pricing</Link>
@@ -84,7 +84,7 @@ export default function Home() {
           </span>
         </h1>
         <p className="text-xl text-neutral-400 max-w-3xl mx-auto mb-10">
-          SkyApp is a production-grade AI orchestration API. Run parallel agent DAGs, persist memory with semantic search,
+          AeviaApp is a production-grade AI orchestration API. Run parallel agent DAGs, persist memory with semantic search,
           and control costs — all via a single REST API.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -112,7 +112,7 @@ export default function Home() {
             <div className="w-3 h-3 rounded-full bg-green-500/70" />
             <span className="text-xs text-neutral-500 ml-2">Example: multi-agent orchestration</span>
           </div>
-          <pre className="p-6 text-sm text-neutral-300 overflow-x-auto"><code>{`curl -X POST https://skyapp-api.onrender.com/agents/orchestrate \\
+          <pre className="p-6 text-sm text-neutral-300 overflow-x-auto"><code>{`curl -X POST https://aevia-app-api.onrender.com/agents/orchestrate \\
   -H "Authorization: Bearer sk_live_..." \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -193,7 +193,7 @@ export default function Home() {
       <footer className="border-t border-white/5 px-6 py-8 max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-neutral-500">
           <Cpu className="w-4 h-4" />
-          <span>SkyApp © 2026 — Built by <a href="https://github.com/Maeglin10" className="text-violet-400 hover:underline">Valentin Milliand</a></span>
+          <span>AeviaApp © 2026 — Built by <a href="https://github.com/Maeglin10" className="text-violet-400 hover:underline">Valentin Milliand</a></span>
         </div>
         <div className="flex gap-6 text-sm text-neutral-500">
           <Link href="/docs" className="hover:text-white transition-colors">Docs</Link>

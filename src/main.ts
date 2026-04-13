@@ -12,7 +12,7 @@ async function bootstrap() {
   );
 
   // Security headers via helmet (Fastify)
-  await app.register(helmet, {
+  void (app as any).register(helmet, {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],

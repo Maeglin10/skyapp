@@ -25,5 +25,6 @@
       "@services/*": ["src/services/*"],
       "@schemas/*": ["src/schemas/*"]
     }
-  }
+  },
+  "exclude": ["node_modules", "dist", "dashboard", "test", "**/*.spec.ts", "**/*.e2e-spec.ts", "prisma/seed.ts"]
 }

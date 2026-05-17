@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { AgentRunnerService } from '../agent/agent-runner.service';
 import { LLMService } from '../llm/llm.service';
 import { TaskGraph, TaskNode } from './task-graph';
@@ -55,7 +56,7 @@ export class OrchestratorService {
       const parsed = JSON.parse(response.content) as Omit<TaskNode, 'status'>[];
       return parsed.map(t => ({ ...t, status: 'PENDING' as const }));
     } catch {
-      return [{ id: crypto.randomUUID(), title: 'Execute objective', description: objective, dependencies: [], agentRole: 'WORKER', status: 'PENDING' }];
+      return [{ id: randomUUID(), title: 'Execute objective', description: objective, dependencies: [], agentRole: 'WORKER', status: 'PENDING' }];
     }
   }
 

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LLMResponse, Message, ToolSchema, ToolCall } from './llm.types';
 import { CacheService } from '../../services/cache/cache.service';
+import type Anthropic from '@anthropic-ai/sdk';
+import type OpenAI from 'openai';
 
 export type LLMProviderKey = 'anthropic' | 'openai' | 'gemini' | 'skymodel';
 
@@ -148,8 +150,8 @@ export class LLMService {
         model,
         max_tokens: 4096,
         system: systemPrompt,
-        messages: anthropicMessages,
-        tools: anthropicTools as any,
+        messages: anthropicMessages as Anthropic.MessageParam[],
+        tools: anthropicTools as Anthropic.Tool[] | undefined,
       });
 
       const toolCalls: ToolCall[] = [];
@@ -198,8 +200,8 @@ export class LLMService {
 
       const response = await client.chat.completions.create({
         model,
-        messages: openaiMessages,
-        tools: openaiTools as any,
+        messages: openaiMessages as OpenAI.Chat.ChatCompletionMessageParam[],
+        tools: openaiTools as OpenAI.Chat.ChatCompletionTool[] | undefined,
         max_tokens: 4096,
       });
 
@@ -249,9 +251,10 @@ export class LLMService {
 
       const systemInstruction = systemPrompt ? `${systemPrompt}\n\nYou are a helpful AI assistant.` : undefined;
 
+      // TODO: type properly - Gemini SDK types for Contents and Tools are complex unions
       const response = await genModel.generateContent({
-        contents: geminiMessages as any,
-        tools: geminiTools as any,
+        contents: geminiMessages as unknown as Parameters<typeof genModel.generateContent>[0]['contents'],
+        tools: geminiTools as unknown as Parameters<typeof genModel.generateContent>[0]['tools'],
         systemInstruction,
       });
 
@@ -303,8 +306,8 @@ export class LLMService {
 
       const response = await client.chat.completions.create({
         model: modelName,
-        messages: msgs,
-        tools: openaiTools as any,
+        messages: msgs as OpenAI.Chat.ChatCompletionMessageParam[],
+        tools: openaiTools as OpenAI.Chat.ChatCompletionTool[] | undefined,
         max_tokens: 4096,
       });
 

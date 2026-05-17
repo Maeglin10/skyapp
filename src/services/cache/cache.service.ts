@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class CacheService implements OnModuleDestroy {
@@ -48,8 +49,7 @@ export class CacheService implements OnModuleDestroy {
   }
 
   buildKey(...parts: unknown[]): string {
-    const hash = require('crypto')
-      .createHash('sha256')
+    const hash = createHash('sha256')
       .update(JSON.stringify(parts))
       .digest('hex')
       .slice(0, 16);
